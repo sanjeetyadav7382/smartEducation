@@ -84,6 +84,22 @@ function toggleTimer() {
                 btn.classList.add('btn-play');
                 updateTimerDisplay();
                 alert("Time's up! Great job studying.");
+                
+                // Log Session to Backend
+                let focusScore = 0;
+                const scoreMetric = document.getElementById('focusScoreMetric');
+                if (scoreMetric && !scoreMetric.textContent.includes('--')) {
+                    focusScore = parseInt(scoreMetric.textContent.replace('%',''));
+                }
+                
+                fetch('http://localhost:5000/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        durationMinutes: initialTime / (60 * 100),
+                        averageFocusScore: isNaN(focusScore) ? 0 : focusScore 
+                    })
+                }).catch(e => console.error("Could not save session.", e));
             }
         }, 10);
         btn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause Timer';
@@ -173,28 +189,32 @@ function logout() {
 }
 
 // Quiz Logic
-const quizData = [
-    {
-        question: "Which of the following is not a Javascript data type?",
-        options: ["Undefined", "Number", "Boolean", "Float"],
-        answer: 3
-    },
-    {
-        question: "What does CSS stand for?",
-        options: ["Cascading Style Sheets", "Computer Style Sheets", "Creative Style Sheets", "Colorful Style Sheets"],
-        answer: 0
-    },
-    {
-        question: "In HTML, which tag is used to define an internal style sheet?",
-        options: ["<script>", "<css>", "<style>", "<link>"],
-        answer: 2
-    }
-];
+let quizData = [];
 
 let currentQuestionIndex = 0;
 let score = 0;
 
-function startQuiz() {
+async function startQuiz() {
+    if(quizData.length === 0) {
+        try {
+            const res = await fetch('http://localhost:5000/api/quizzes');
+            if(res.ok) {
+                quizData = await res.json();
+            } else {
+                throw new Error("Failed to load quizzes");
+            }
+        } catch(err) {
+            console.error(err);
+            alert("Could not load quizzes from server.");
+            return;
+        }
+    }
+
+    if(quizData.length === 0) {
+        alert("No quizzes available.");
+        return;
+    }
+
     document.getElementById('quizSetup').style.display = 'block';
     document.getElementById('quizResults').style.display = 'none';
     document.getElementById('quizActive').style.display = 'flex';
