@@ -100,16 +100,10 @@ function resetTimer() {
 }
 
 // Notes Logic
-document.addEventListener("DOMContentLoaded", () => {
-    // Restore notes from localStorage
-    const savedNotes = localStorage.getItem('smartEduNotes');
-    if (savedNotes) {
-        document.getElementById('notesArea').value = savedNotes;
-    }
-    
+document.addEventListener("DOMContentLoaded", async () => {
     // Initial display config
     updateTimerDisplay();
-    
+
     // Previous simple animation for dashboard stats
     const stats = document.querySelectorAll('.stat-card h3');
     stats.forEach(stat => {
@@ -121,13 +115,55 @@ document.addEventListener("DOMContentLoaded", () => {
             stat.style.transform = 'translateY(0)';
         }, 300);
     });
-});
 
-function saveNotes() {
+    // Fetch notes from Backend API
+    try {
+        const response = await fetch('http://localhost:5000/api/notes');
+        if(response.ok) {
+            const notes = await response.json();
+            if(notes && notes.length > 0) {
+                // Populate the exact scratch-pad Note content
+                document.getElementById('notesArea').value = notes[0].content;
+            }
+        }
+    } catch(err) {
+        console.warn("Backend unavailable, loading from local storage.", err);
+        // Fallback to local storage if API is down
+        const savedNotes = localStorage.getItem('smartEduNotes');
+        if (savedNotes) {
+            document.getElementById('notesArea').value = savedNotes;
+        }
+    }
+});
+    
+
+async function saveNotes() {
     const text = document.getElementById('notesArea').value;
+    const msg = document.getElementById('saveMsg');
+    
+    // Backup locally
     localStorage.setItem('smartEduNotes', text);
     
-    const msg = document.getElementById('saveMsg');
+    try {
+        // Send to backend DB
+        const response = await fetch('http://localhost:5000/api/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: text })
+        });
+        
+        if (response.ok) {
+            msg.textContent = "Saved to Database!";
+            msg.style.color = "#34d399";
+        } else {
+            msg.textContent = "API error, saved locally!";
+            msg.style.color = "#fbbf24";
+        }
+    } catch(err) {
+        msg.textContent = "Offline, saved locally!";
+        msg.style.color = "#fbbf24";
+    }
+    
     msg.style.opacity = 1;
     setTimeout(() => { msg.style.opacity = 0; }, 2000);
 }
